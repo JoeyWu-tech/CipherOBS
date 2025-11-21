@@ -2,7 +2,4 @@ scripts/train/StageTwo_Diffusion/figures/
 scripts/train/StageOne_Diffusion/output/
 scripts/train/StageTwo_Diffusion/outputs/sim2obc_ids_new_data_0623/
 scripts/train/new_data/
-/home/wuyin/CipherOBS/scripts/train/StageOne_Diffusion/models/__pycache__
-/home/wuyin/CipherOBS/scripts/train/StageTwo_Diffusion/configs/__pycache__
-/home/wuyin/CipherOBS/scripts/train/StageTwo_Diffusion/dataset/__pycache__
-/home/wuyin/CipherOBS/scripts/train/StageTwo_Diffusion/src/__pycache__
+__pycache__/
