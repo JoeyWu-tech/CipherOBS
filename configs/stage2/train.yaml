@@ -1,0 +1,78 @@
+# Stage 2: Stroke Refinement (SR) Training Configuration
+# All paths are relative to project root: /home/wuyin/CipherOBS
+
+# Experiment settings
+experiment:
+  name: "stage2_stroke_refinement"
+  seed: 123
+  output_dir: "outputs/stage2/"
+  logging_dir: "logs"
+  report_to: "tensorboard"
+
+# Data settings
+data:
+  root: "data/"
+  train_phase: "train"
+  style_image_path: "data/style_reference.png"
+  ids_path: "data/han_ids.txt"
+  glyph_path: "data/glyphs.json"
+  num_workers: 4
+
+# Model architecture
+model:
+  resolution: 96
+  unet_channels: [64, 128, 256, 512]
+  style_image_size: 96
+  content_image_size: 96
+  content_encoder_downsample_size: 3
+  channel_attn: true
+  content_start_channel: 64
+  style_start_channel: 64
+
+# Training settings
+training:
+  batch_size: 32
+  max_train_steps: 50000
+  gradient_accumulation_steps: 1
+  ckpt_interval: 5000
+  log_interval: 50
+  # Phase 1 checkpoint (optional, for fine-tuning)
+  phase_1_ckpt_dir: null
+  # Phase 2 SCR settings (optional)
+  phase_2: false
+  scr_ckpt_path: null
+  temperature: 0.07
+  mode: "refinement"
+  scr_image_size: 96
+  num_neg: 16
+  nce_layers: "0,1,2,3"
+  sc_coefficient: 0.01
+
+# Loss coefficients
+loss:
+  perceptual_coefficient: 0.01
+  offset_coefficient: 0.5
+
+# Optimizer settings
+optimizer:
+  learning_rate: 0.0001
+  scale_lr: false
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_weight_decay: 0.01
+  adam_epsilon: 0.00000001
+  max_grad_norm: 1.0
+
+# Learning rate scheduler
+lr_scheduler:
+  type: "linear"
+  warmup_steps: 10000
+
+# Classifier-free guidance
+classifier_free:
+  drop_prob: 0.1
+  beta_scheduler: "scaled_linear"
+
+# Mixed precision
+mixed_precision: "no"
+

@@ -1,0 +1,49 @@
+# Configuration for OBS Dictionary Retrieval Inference
+# Reference: Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval
+
+# ============================================================================
+# Data Paths
+# ============================================================================
+
+# Directory containing query OBS images (images to be deciphered)
+# Expected filename format: test_{label}_{index}.png
+query_dir: "data/test/target"
+
+# Directory containing dictionary images (generated from Stage 1 & 2)
+# These are the predicted OBS shapes for modern Chinese characters
+dict_dir: "data/test/dictionary"
+
+# ============================================================================
+# Model Configuration
+# ============================================================================
+
+# Directory containing trained feature extraction model
+# Should contain: opts.yaml, net_*.pth checkpoint files
+# For example, 
+model_dir: "weights/retrieval/convnext_tri/"
+
+# ============================================================================
+# Image Processing
+# ============================================================================
+
+# Image dimensions
+height: 256
+width: 256
+
+# Padding for query images (handles boundary artifacts in rubbings)
+pad: 0
+
+# Multi-scale factors for feature extraction
+# More scales = better accuracy but slower inference
+scales: [1.0]
+
+# ============================================================================
+# Inference Settings
+# ============================================================================
+
+# Batch size for feature extraction
+batch_size: 8
+
+# Output directory for results
+output_dir: "results/retrieval"
+

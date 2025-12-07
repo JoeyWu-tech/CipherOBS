@@ -1,0 +1,67 @@
+# Stage 1: Font-Augmented Diffusion (FAD) Inference Configuration
+# All paths are relative to project root: /home/wuyin/CipherOBS
+
+data:
+    image_size: 64
+    channels: 3
+    training_keep_image_size: false
+    testing_keep_image_size: true
+    num_workers: 4
+    # Data directories (relative to project root)
+    train_data_dir: 'data/train/'
+    test_data_dir: 'data/test/'
+    test_save_dir: 'outputs/stage1/results/'
+    val_save_dir: 'outputs/stage1/validation/'
+    grid_r: 8
+    conditional: true
+    tensorboard: 'outputs/stage1/logs/'
+
+model:
+    in_channels: 3
+    out_ch: 3
+    ch: 128
+    ch_mult: [1, 2, 3, 4]
+    num_res_blocks: 2
+    attn_resolutions: [16]
+    dropout: 0.0
+    ema_rate: 0.999
+    ema: true
+    resamp_with_conv: true
+
+diffusion:
+    beta_schedule: cosine
+    beta_start: 0.0001
+    beta_end: 0.02
+    num_diffusion_timesteps: 1000
+
+training:
+    patch_n: 8
+    batch_size: 16
+    n_epochs: 300
+    n_iters: 2000000
+    snapshot_freq: 20
+    validation_freq: 10000
+    # Checkpoint settings
+    # Option 1: Specify exact checkpoint path (without .pth.tar extension)
+    # resume: 'outputs/stage1/checkpoints/diffusion_model_299'
+    # Option 2: Set to "auto" to automatically select the latest checkpoint
+    resume: 'auto'
+    # Base path for auto checkpoint selection (used when resume is "auto")
+    resume_base: 'outputs/stage1/checkpoints/diffusion_model'
+    seed: 61
+    amp: false
+
+sampling:
+    batch_size: 8
+    last_only: true
+    sampling_timesteps: 50
+
+optim:
+    weight_decay: 0.0
+    optimizer: "Adam"
+    lr: 0.00002
+    warmup_epochs: 100
+    lr_schedule: "constant"
+    amsgrad: false
+    eps: 0.00000001
+

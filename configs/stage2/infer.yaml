@@ -1,0 +1,51 @@
+# Stage 2: Stroke Refinement (SR) Inference Configuration
+# All paths are relative to project root: /home/wuyin/CipherOBS
+
+# Experiment settings
+experiment:
+  seed: 61
+  output_dir: "outputs/stage2/inference/"
+
+# Data settings
+data:
+  input_dir: "data/test/stage1_output/"
+  style_image_path: "data/style_reference.png"
+  ids_path: "data/han_ids.txt"
+  glyph_path: "data/glyphs.json"
+
+# Model settings
+model:
+  resolution: 96
+  unet_channels: [64, 128, 256, 512]
+  style_image_size: 96
+  content_image_size: 96
+  content_encoder_downsample_size: 3
+  channel_attn: true
+  content_start_channel: 64
+  style_start_channel: 64
+  # Checkpoint settings
+  # Option 1: Specify exact checkpoint path
+  # ckpt_dir: "outputs/stage2/global_step_50000/"
+  # Option 2: Set to "auto" to automatically select the latest checkpoint
+  ckpt_dir: "auto"
+  # Base directory for auto checkpoint selection (used when ckpt_dir is "auto")
+  ckpt_base_dir: "outputs/stage2/"
+
+# Sampling settings
+sampling:
+  algorithm_type: "dpmsolver++"
+  guidance_type: "classifier-free"
+  guidance_scale: 7.5
+  num_inference_steps: 20
+  model_type: "noise"
+  order: 2
+  skip_type: "time_uniform"
+  method: "multistep"
+  correcting_x0_fn: null
+  t_start: null
+  t_end: null
+
+# Output settings
+output:
+  image_size: 112
+

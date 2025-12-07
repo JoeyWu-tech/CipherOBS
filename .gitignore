@@ -3,3 +3,5 @@ scripts/train/StageOne_Diffusion/output/
 scripts/train/StageTwo_Diffusion/outputs/sim2obc_ids_new_data_0623/
 scripts/train/new_data/
 __pycache__/
+doc/
+src/crossview
