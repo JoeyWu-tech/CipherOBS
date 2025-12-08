@@ -206,3 +206,4 @@ def convnext_base(pretrained=True, in_22k=True, **kwargs):
         model.load_state_dict(checkpoint["model"], strict=False)
     return model
 
+

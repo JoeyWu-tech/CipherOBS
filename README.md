@@ -333,7 +333,7 @@ If you find this work useful, please cite our paper:
 @article{CipherOBS2025,
   title   = {Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval},
   author  = {Wu, Yin and Zhang, Gangjian and Chen, Jiayu and Xu, Chang and Luo, Yuyu and Tang, Nan and Xiong, Hui},
-  journal = {Nature Machine Intelligence},
+  journal = {Submitted to Nature Machine Intelligence},
   year    = {2025}
 }
 ```
