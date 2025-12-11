@@ -333,6 +333,7 @@ If you find this work useful, please cite our paper:
 @article{CipherOBS2025,
   title   = {Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval},
   author  = {Wu, Yin and Zhang, Gangjian and Chen, Jiayu and Xu, Chang and Luo, Yuyu and Tang, Nan and Xiong, Hui},
+  
   journal = {Submitted to Nature Machine Intelligence},
   year    = {2025}
 }
@@ -345,7 +346,7 @@ If you find this work useful, please cite our paper:
 For questions or issues regarding the code or paper, please:
 
 1. Open an issue in this repository
-2. Contact the corresponding author: **Yin WU** ([ywu450@connect.hkust-gz.edu.cn](mailto:ywu450@connect.hkust-gz.edu.cn))
+2. Contact the author: **Yin WU** ([ywu450@connect.hkust-gz.edu.cn](mailto:ywu450@connect.hkust-gz.edu.cn))
 
 ---
 
