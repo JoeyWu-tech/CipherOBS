@@ -28,19 +28,23 @@ CipherOBS uses a two-stage generative pipeline:
 ```
 data/
 ├── train/                          # Training data
-│   ├── input/                      # [Stage 1] Source font images
+│   ├── input/                      # [Stage 1] Source font images (modern Chinese)
 │   ├── target/                     # [Stage 1] Target OBS images
 │   ├── run_1/                      # [Stage 2] Stage 1 outputs (content images)
 │   └── TargetImage/
 │       └── style0/                 # [Stage 2] Target style OBS images
 │
 ├── test/                           # Test/Evaluation data
-│   ├── input/                      # [Stage 1] Test input images
-│   └── target/                     # [Stage 1] Ground truth for evaluation
+│   ├── input/                      # [Stage 1] Test input images (modern Chinese)
+│   └── target/                     # [Retrieval] Query OBS images
 │
 ├── style_reference.png             # [Stage 2] Global style reference image
 ├── han_ids.txt                     # [Stage 2] IDS (Ideographic Description Sequence) encodings
 └── glyphs.json                     # [Stage 2] Glyph vocabulary for IDS encoder
+
+# Note: Generated outputs are stored in outputs/ directory:
+# - outputs/stage1/results/      -> Stage 1 inference outputs
+# - outputs/stage2/inference/    -> Stage 2 inference outputs (dictionary)
 ```
 
 ---

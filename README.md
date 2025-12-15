@@ -102,10 +102,8 @@ data/
 │       └── style0/            # Stage 2: Target style OBS images
 │
 ├── test/
-│   ├── input/                 # Test source images
-│   ├── target/                # Ground truth OBS images
-│   ├── stage1_output/         # Stage 1 inference outputs (for Stage 2)
-│   └── dictionary/            # Generated dictionary for retrieval
+│   ├── input/                 # Test source images (modern Chinese)
+│   └── target/                # Query OBS images (for retrieval evaluation)
 │
 ├── style_reference.png        # Stage 2: Global style reference image
 ├── han_ids.txt                # IDS (Ideographic Description Sequence) encodings
@@ -234,7 +232,7 @@ Refine Stage 1 outputs with stroke-level enhancement.
 ```yaml
 # configs/stage2/infer.yaml
 data:
-  input_dir: 'data/test/stage1_output/'  # Stage 1 outputs
+  input_dir: 'outputs/stage1/results/'  # Stage 1 outputs
   style_image_path: 'data/style_reference.png'
 
 model:
@@ -257,8 +255,8 @@ Match query OBS images against the synthetic dictionary.
 
 ```yaml
 # configs/retrieval/infer.yaml
-query_dir: 'data/test/target'      # Query images (unknown OBS)
-dict_dir: 'data/test/dictionary'   # Generated dictionary
+query_dir: 'data/test/target/'           # Query images (unknown OBS)
+dict_dir: 'outputs/stage2/inference/'    # Generated dictionary (Stage 2 output)
 model_dir: 'weights/retrieval/convnext_tri/'
 ```
 

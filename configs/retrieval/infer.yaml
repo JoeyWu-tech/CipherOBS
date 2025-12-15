@@ -11,7 +11,7 @@ query_dir: "data/test/target"
 
 # Directory containing dictionary images (generated from Stage 1 & 2)
 # These are the predicted OBS shapes for modern Chinese characters
-dict_dir: "data/test/dictionary"
+dict_dir: "outputs/stage2/inference/"
 
 # ============================================================================
 # Model Configuration

@@ -8,7 +8,7 @@ experiment:
 
 # Data settings
 data:
-  input_dir: "data/test/stage1_output/"
+  input_dir: "outputs/stage1/results/"
   style_image_path: "data/style_reference.png"
   ids_path: "data/han_ids.txt"
   glyph_path: "data/glyphs.json"
