@@ -166,8 +166,8 @@ We provide **four ways** to reproduce our results, from quickest (using pre-comp
 |--------|------|--------------|-------------|
 | [**Option 1: Demo Notebook**](#option-1-demo-notebook-fastest) | ~1 min | Pre-computed features | Reproduce main results instantly |
 | [**Option 2: Retrieval Only**](#option-2-retrieval-only) | ~5 min | Pre-generated dictionary | Run retrieval on provided dictionary |
-| [**Option 3: Full Inference**](#option-3-full-inference-pipeline) | ~30 min | Pre-trained weights | Generate dictionary + retrieval |
-| [**Option 4: Train from Scratch**](#option-4-train-from-scratch) | ~2 days | Training data | Complete reproduction |
+| [**Option 3: Full Inference**](#option-3-full-inference-pipeline) | ~2 days | Pre-trained weights | Generate dictionary + retrieval |
+| [**Option 4: Train from Scratch**](#option-4-train-from-scratch) | ~14 days | Training data | Complete reproduction |
 
 ### Option 1: Demo Notebook (Fastest)
 
