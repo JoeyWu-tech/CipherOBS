@@ -54,6 +54,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Navigate to project root and set up PYTHONPATH
+cd "$(dirname "$0")/.."
+PROJECT_ROOT=$(pwd)
+export PYTHONPATH="${PROJECT_ROOT}/src:${PYTHONPATH}"
+
 # Build command
 CMD="python src/retrieval/infer.py --config ${CONFIG} --gpu ${GPU}"
 

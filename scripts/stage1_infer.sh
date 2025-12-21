@@ -3,7 +3,7 @@
 # Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval
 
 # Configuration
-NUM_GPUS=8
+NUM_GPUS=1
 MASTER_PORT=1235
 CONFIG="configs/stage1/infer.yaml"
 
@@ -25,8 +25,11 @@ echo "========================================"
 # Create output directory
 mkdir -p outputs/stage1/results
 
+# Add src to PYTHONPATH for proper package resolution
+export PYTHONPATH="${PROJECT_ROOT}/src:${PYTHONPATH}"
+
 # Run distributed inference
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python -m torch.distributed.run \
+CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.run \
     --nproc_per_node=${NUM_GPUS} \
     --nnodes=1 \
     --node_rank=0 \

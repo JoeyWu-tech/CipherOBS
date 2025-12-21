@@ -19,6 +19,7 @@ Reference:
 """
 
 import argparse
+import math
 import os
 import time
 from typing import Dict, List, Tuple
@@ -26,21 +27,14 @@ from typing import Dict, List, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import yaml
 
-# Handle both package and direct imports
-try:
-    from .transforms import get_query_transforms, get_dictionary_transforms
-    from .utils import load_model, parse_filename, LabelMapper
-except ImportError:
-    from transforms import get_query_transforms, get_dictionary_transforms
-    from utils import load_model, parse_filename, LabelMapper
-
-# Note: Feature extraction model should be placed in weights/ConvNext/
-# See weights/ConvNext/README.md for download instructions
+from retrieval.transforms import get_query_transforms, get_dictionary_transforms
+from retrieval.utils import load_model, parse_filename, LabelMapper
 
 
 # ============================================================================
@@ -51,11 +45,6 @@ class RetrievalDataset(Dataset):
     """Dataset for OBS retrieval.
     
     Loads images from a directory and extracts labels from filenames.
-    
-    Args:
-        data_dir: Directory containing images.
-        transform: Image transforms to apply.
-        label_mapper: LabelMapper instance for consistent label encoding.
     """
     
     def __init__(self, data_dir: str, transform, label_mapper: LabelMapper):
@@ -64,8 +53,9 @@ class RetrievalDataset(Dataset):
         self.label_mapper = label_mapper
         
         self.samples = []  # List of (filepath, label_id)
+        self.imgs = []     # For compatibility with legacy code
         
-        for filename in sorted(os.listdir(data_dir)):
+        for filename in os.listdir(data_dir):
             if not filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.tif')):
                 continue
             
@@ -76,6 +66,7 @@ class RetrievalDataset(Dataset):
             filepath = os.path.join(data_dir, filename)
             label_id = label_mapper.get_id(label)
             self.samples.append((filepath, label_id))
+            self.imgs.append((filepath, label_id))
     
     def __len__(self):
         return len(self.samples)
@@ -91,22 +82,29 @@ class RetrievalDataset(Dataset):
 
 
 # ============================================================================
-# Feature Extraction
+# Feature Extraction (matches legacy test.py exactly)
 # ============================================================================
+
+def fliplr(img):
+    """Flip horizontal (legacy compatible)."""
+    inv_idx = torch.arange(img.size(3) - 1, -1, -1).long()
+    img_flip = img.index_select(3, inv_idx)
+    return img_flip
+
 
 def extract_features(
     model: nn.Module,
     dataloader: DataLoader,
-    view_type: str = 'query',
+    view_index: int = 1,
     device: str = 'cuda',
     scales: List[float] = [1.0]
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Extract features from images with multi-scale and flip augmentation.
+    """Extract features from images (matches legacy test.py exactly).
     
     Args:
         model: Feature encoder model.
         dataloader: DataLoader for images.
-        view_type: 'query' or 'dictionary'.
+        view_index: 1 for gallery/dictionary, 3 for query (legacy convention).
         device: Device to run inference on.
         scales: List of scale factors for multi-scale extraction.
         
@@ -114,205 +112,168 @@ def extract_features(
         features: Tensor of shape (N, D) with L2-normalized features.
         labels: Tensor of shape (N,) with label IDs.
     """
-    features = []
-    labels = []
+    features = torch.FloatTensor()
+    labels = torch.FloatTensor()
     
     model.eval()
     with torch.no_grad():
-        for images, batch_labels in tqdm(dataloader, desc=f'Extracting {view_type} features'):
-            images = images.to(device)
-            batch_size = images.size(0)
+        for data in tqdm(dataloader, desc=f'Extracting features (view={view_index})'):
+            img, label = data
+            n, c, h, w = img.size()
             
-            # Multi-scale and flip augmentation
-            batch_features = None
-            for scale in scales:
-                for flip in [False, True]:
-                    # Apply flip
-                    if flip:
-                        imgs = torch.flip(images, dims=[3])  # Horizontal flip
-                    else:
-                        imgs = images
-                    
-                    # Apply scale
-                    if scale != 1.0:
-                        imgs = nn.functional.interpolate(
-                            imgs, scale_factor=scale, mode='bilinear', align_corners=False
+            ff = None
+            for i in range(2):  # 0=normal, 1=flipped
+                if i == 1:
+                    img = fliplr(img)
+                input_img = Variable(img.to(device))
+                
+                for scale in scales:
+                    if scale != 1:
+                        input_img = nn.functional.interpolate(
+                            input_img, scale_factor=scale, 
+                            mode='bilinear', align_corners=False
                         )
                     
-                    # Forward pass
-                    if view_type == 'query':
-                        out, _ = model(imgs, None)
-                    else:  # dictionary
-                        _, out = model(None, imgs)
-                    
-                    if batch_features is None:
-                        batch_features = out
+                    # View index: 1=gallery (first output), 3=query (second output)
+                    if view_index == 1:
+                        outputs, _ = model(input_img, None)
+                    elif view_index == 3:
+                        _, outputs = model(None, input_img)
                     else:
-                        batch_features = batch_features + out
+                        raise ValueError(f"Invalid view_index: {view_index}")
+                    
+                    if ff is None:
+                        ff = outputs
+                    else:
+                        ff = ff + outputs
             
-            # Average over augmentations
-            batch_features = batch_features / (len(scales) * 2)
-            
-            # L2 normalize
-            if len(batch_features.shape) == 3:
-                # Part features: (B, D, P) -> flatten and normalize
-                fnorm = torch.norm(batch_features, p=2, dim=1, keepdim=True) * np.sqrt(batch_features.size(-1))
-                batch_features = batch_features / fnorm
-                batch_features = batch_features.view(batch_size, -1)
+            # Norm feature (matches legacy code exactly)
+            if len(ff.shape) == 3:
+                fnorm = torch.norm(ff, p=2, dim=1, keepdim=True) * np.sqrt(ff.size(-1))
+                ff = ff.div(fnorm.expand_as(ff))
+                ff = ff.view(ff.size(0), -1)
             else:
-                fnorm = torch.norm(batch_features, p=2, dim=1, keepdim=True)
-                batch_features = batch_features / fnorm
+                fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
+                ff = ff.div(fnorm.expand_as(ff))
             
-            features.append(batch_features.cpu())
-            labels.append(batch_labels)
-    
-    features = torch.cat(features, dim=0)
-    labels = torch.cat(labels, dim=0)
+            features = torch.cat((features, ff.data.cpu()), 0)
+            labels = torch.cat((labels, label.float()), 0)
     
     return features, labels
 
 
 # ============================================================================
-# Voting-based Reranking
+# Voting-based Reranking (matches legacy test.py exactly)
 # ============================================================================
 
 def voting_rerank(
-    query_feature: torch.Tensor,
-    query_label: int,
-    dict_features: torch.Tensor,
-    dict_labels: np.ndarray
+    qf: torch.Tensor,
+    ql: int,
+    gf: torch.Tensor,
+    gl: np.ndarray
 ) -> List[int]:
-    """Voting-based reranking for a single query.
-    
-    This is the core algorithm from the paper. For each character label that 
-    appears before the first correct match, we compute its average rank across
-    all dictionary entries with that label. Labels are then re-ranked by this
-    average rank score.
+    """Voting-based reranking for a single query (matches legacy exactly).
     
     Args:
-        query_feature: Query feature vector (D,).
-        query_label: Ground truth label ID.
-        dict_features: Dictionary features (N, D).
-        dict_labels: Dictionary label IDs (N,).
+        qf: Query feature vector (D,).
+        ql: Query label (int).
+        gf: Gallery features (N, D).
+        gl: Gallery labels (N,).
         
     Returns:
-        new_rank: Binary list where position i is 1 if the query's true label
+        new_rank: Binary list where position i is 1 if query's true label
                   appears in top-(i+1) after voting rerank.
     """
-    if not isinstance(dict_labels, np.ndarray):
-        dict_labels = np.array(dict_labels)
+    if not isinstance(gl, np.ndarray):
+        gl = np.array(gl)
     
-    # Compute cosine similarity
-    query = query_feature.view(-1, 1)
-    scores = torch.mm(dict_features, query).squeeze(1).cpu().numpy()
+    query = qf.view(-1, 1)
+    score = torch.mm(gf, query)
+    score = score.squeeze(1).cpu()
+    score = score.numpy()
     
-    # Sort by similarity (descending)
-    sorted_indices = np.argsort(scores)[::-1]
+    # Sort descending
+    index = np.argsort(score)[::-1]
     
-    # Find positions of correct matches
-    correct_positions = np.argwhere(dict_labels == query_label).flatten()
-    if len(correct_positions) == 0:
-        return [0] * len(sorted_indices)
+    # Find good and junk indices
+    query_index = np.argwhere(gl == ql)
+    good_index = query_index
+    junk_index = np.argwhere(gl == -1)
     
-    # Find first correct match in sorted list
-    sorted_labels = dict_labels[sorted_indices]
-    correct_mask = np.in1d(sorted_indices, correct_positions)
-    first_correct_pos = np.argwhere(correct_mask).flatten()
+    if good_index.size == 0:
+        new_rank = [0] * len(index)
+        return new_rank
     
-    if len(first_correct_pos) == 0:
-        return [0] * len(sorted_indices)
+    # Remove junk_index (legacy behavior)
+    mask = np.in1d(index, junk_index, invert=True)
+    index = index[mask]
     
-    first_correct_pos = first_correct_pos[0]
+    # Find good_index positions
+    mask = np.in1d(index, good_index)
+    rows_good = np.argwhere(mask == True)
+    rows_good = rows_good.flatten()
     
-    # Voting: compute average rank for each label before first correct match
-    seen_labels = []
-    label_scores = {}
+    if len(rows_good) == 0:
+        new_rank = [0] * len(index)
+        return new_rank
     
-    for i in range(first_correct_pos + 1):
-        current_label = sorted_labels[i]
-        
-        if current_label not in seen_labels:
-            seen_labels.append(current_label)
-            
-            # Find all positions of this label in sorted list
-            label_positions = np.argwhere(sorted_labels == current_label).flatten()
-            
-            # Average rank score
-            label_scores[current_label] = np.mean(label_positions)
+    # Core voting reranking algorithm
+    calculated_label = []
+    label_score = {}
+    for i in range(rows_good[0] + 1):
+        current_label = gl[index[i]]
+        if current_label not in calculated_label:
+            calculated_label.append(current_label)
+            label_index = np.argwhere(gl == current_label)
+            label_mask = np.in1d(index, label_index)
+            rows_good_label = np.argwhere(label_mask == True)
+            rows_good_label = rows_good_label.flatten()
+            label_score[current_label] = sum(rows_good_label) / len(rows_good_label)
     
-    # Re-rank labels by average rank score
-    ranked_labels = sorted(label_scores.keys(), key=lambda x: label_scores[x])
-    
-    # Find new rank of query label
-    new_label_rank = len(ranked_labels)  # Default to worst case
-    for i, label in enumerate(ranked_labels):
-        if label == query_label:
-            new_label_rank = i
+    sorted_labels = [k for k, v in sorted(label_score.items(), key=lambda x: x[1])]
+    new_ql_rank = len(sorted_labels)
+    for i in range(len(sorted_labels)):
+        if sorted_labels[i] == ql:
+            new_ql_rank = i
             break
     
-    # Generate binary rank list
-    new_rank = [0] * len(sorted_indices)
-    for i in range(len(sorted_indices)):
-        if i >= new_label_rank:
+    new_rank = [0] * len(index)
+    for i in range(len(index)):
+        if i >= new_ql_rank:
             new_rank[i] = 1
     
     return new_rank
 
 
-def compute_topn_accuracy(
-    query_features: torch.Tensor,
-    query_labels: torch.Tensor,
-    dict_features: torch.Tensor,
-    dict_labels: torch.Tensor,
+def compute_voting_rerank_results(
+    query_feature: torch.Tensor,
+    query_label: List[int],
+    gallery_feature: torch.Tensor,
+    gallery_label: List[int],
     device: str = 'cuda'
-) -> Dict[str, float]:
-    """Compute Top-N accuracy with voting-based reranking.
+) -> List[float]:
+    """Compute voting rerank results for all queries (matches legacy)."""
+    print("Performing voting-based reranking...")
     
-    Args:
-        query_features: Query features (Q, D).
-        query_labels: Query labels (Q,).
-        dict_features: Dictionary features (N, D).
-        dict_labels: Dictionary labels (N,).
-        device: Device for computation.
-        
-    Returns:
-        Dictionary containing Top-N accuracy for N = 1, 5, 10, 50, 100.
-    """
-    query_features = query_features.to(device)
-    dict_features = dict_features.to(device)
+    query_feature = query_feature.to(device)
+    gallery_feature = gallery_feature.to(device)
+    gallery_label_np = np.array(gallery_label)
     
-    query_labels_np = query_labels.numpy()
-    dict_labels_np = dict_labels.numpy()
+    new_rank_all = [0] * len(gallery_label)
     
-    num_queries = len(query_labels)
-    num_gallery = len(dict_labels)
-    
-    # Aggregate voting results
-    rank_results = np.zeros(num_gallery)
-    
-    print("Computing Top-N accuracy with voting rerank...")
-    for i in tqdm(range(num_queries), desc="Voting rerank"):
-        new_rank = voting_rerank(
-            query_features[i],
-            query_labels_np[i],
-            dict_features,
-            dict_labels_np
+    for i in tqdm(range(len(query_label)), desc="Voting rerank"):
+        new_rank_tmp = voting_rerank(
+            query_feature[i], 
+            query_label[i], 
+            gallery_feature, 
+            gallery_label_np
         )
-        rank_results += np.array(new_rank)
+        new_rank_all = [x + y for x, y in zip(new_rank_all, new_rank_tmp)]
     
-    # Average over all queries
-    rank_results = rank_results / num_queries
+    # Average
+    new_rank_all = [x / len(query_label) for x in new_rank_all]
     
-    # Extract Top-N accuracy
-    results = {
-        'Top-1': rank_results[0] * 100,
-        'Top-5': rank_results[min(4, num_gallery - 1)] * 100,
-        'Top-10': rank_results[min(9, num_gallery - 1)] * 100,
-        'Top-50': rank_results[min(49, num_gallery - 1)] * 100,
-        'Top-100': rank_results[min(99, num_gallery - 1)] * 100,
-    }
-    
-    return results
+    return new_rank_all
 
 
 # ============================================================================
@@ -351,10 +312,23 @@ def main():
     model, model_config, epoch = load_model(model_dir, device)
     print(f"Loaded model from epoch: {epoch}")
     
-    # Setup transforms
-    h, w = config.get('height', 256), config.get('width', 256)
+    # Setup transforms with config from model
+    h = model_config.get('h', config.get('height', 256))
+    w = model_config.get('w', config.get('width', 256))
+    # Note: Use pad from inference config (not model config) to match legacy test.py behavior
+    # Legacy test.py uses argparse default pad=0, does not load from model config
     pad = config.get('pad', 0)
-    scales = config.get('scales', [1.0])
+    
+    # Multi-scale (parse from config, default to 1)
+    ms_str = config.get('ms', '1')
+    if isinstance(ms_str, str):
+        scales = [math.sqrt(float(s)) for s in ms_str.split(',')]
+    elif isinstance(ms_str, list):
+        scales = [math.sqrt(s) for s in ms_str]
+    else:
+        scales = [1.0]
+    
+    print(f"Image size: {h}x{w}, pad: {pad}, scales: {scales}")
     
     query_transform = get_query_transforms(h, w, pad)
     dict_transform = get_dictionary_transforms(h, w)
@@ -374,36 +348,43 @@ def main():
     query_loader = DataLoader(query_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     dict_loader = DataLoader(dict_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     
-    # Extract features
+    # Extract features using legacy view indices
+    # Gallery/Dictionary = view 1, Query = view 3
     start_time = time.time()
     
-    query_features, query_labels = extract_features(
-        model, query_loader, 'query', device, scales
+    gallery_feature, gallery_labels = extract_features(
+        model, dict_loader, view_index=1, device=device, scales=scales
     )
-    dict_features, dict_labels = extract_features(
-        model, dict_loader, 'dictionary', device, scales
+    query_feature, query_labels = extract_features(
+        model, query_loader, view_index=3, device=device, scales=scales
     )
     
     extraction_time = time.time() - start_time
     print(f"Feature extraction completed in {extraction_time:.1f}s")
     
-    # Compute Top-N accuracy
-    results = compute_topn_accuracy(
-        query_features, query_labels,
-        dict_features, dict_labels,
+    # Get labels as lists (matches legacy)
+    gallery_label = [int(l) for l in gallery_labels.numpy()]
+    query_label = [int(l) for l in query_labels.numpy()]
+    
+    # Compute voting rerank results
+    new_rank_results = compute_voting_rerank_results(
+        query_feature, query_label,
+        gallery_feature, gallery_label,
         device
     )
     
     # Print results
-    print("\n" + "=" * 50)
-    print("Retrieval Results (with Voting Rerank)")
-    print("=" * 50)
-    for metric, value in results.items():
-        print(f"{metric}: {value:.2f}%")
-    print("=" * 50)
+    num_gallery = len(gallery_label)
+    print('\nTop1:%.2f Top10:%.2f Top20:%.2f Top50:%.2f Top100:%.2f' % (
+        new_rank_results[0] * 100,
+        new_rank_results[min(9, num_gallery - 1)] * 100,
+        new_rank_results[min(19, num_gallery - 1)] * 100,
+        new_rank_results[min(49, num_gallery - 1)] * 100,
+        new_rank_results[min(99, num_gallery - 1)] * 100,
+    ))
     
     # Save results
-    output_dir = config.get('output_dir', './results')
+    output_dir = config.get('output_dir', './results/retrieval')
     os.makedirs(output_dir, exist_ok=True)
     
     output_file = os.path.join(output_dir, 'retrieval_results.txt')
@@ -415,8 +396,13 @@ def main():
         f.write(f"Number of queries: {len(query_dataset)}\n")
         f.write(f"Dictionary size: {len(dict_dataset)}\n")
         f.write("=" * 50 + "\n")
-        for metric, value in results.items():
-            f.write(f"{metric}: {value:.2f}%\n")
+        f.write('Top1:%.2f Top10:%.2f Top20:%.2f Top50:%.2f Top100:%.2f\n' % (
+            new_rank_results[0] * 100,
+            new_rank_results[min(9, num_gallery - 1)] * 100,
+            new_rank_results[min(19, num_gallery - 1)] * 100,
+            new_rank_results[min(49, num_gallery - 1)] * 100,
+            new_rank_results[min(99, num_gallery - 1)] * 100,
+        ))
     
     print(f"\nResults saved to: {output_file}")
     
@@ -426,4 +412,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

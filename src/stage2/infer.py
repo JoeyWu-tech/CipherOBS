@@ -159,7 +159,8 @@ def load_fontdiffuser_pipeline(args, device):
     )
     
     # Load checkpoint
-    total_model = torch.load(os.path.join(args.ckpt_dir, "total_model.pth"), map_location='cpu')
+    # Note: weights_only=False is required because the checkpoint contains the full model object
+    total_model = torch.load(os.path.join(args.ckpt_dir, "total_model.pth"), map_location='cpu', weights_only=False)
     model.unet.load_state_dict(total_model.unet.state_dict())
     model.content_encoder.load_state_dict(total_model.content_encoder.state_dict())
     model.ids_style_encoder.load_state_dict(total_model.ids_style_encoder.state_dict())

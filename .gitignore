@@ -5,3 +5,10 @@ scripts/train/new_data/
 __pycache__/
 doc/
 src/crossview
+data/
+tmp/
+outputs/
+/home/wuyin/CipherOBS/data/style_reference.png
+weights/
+data/test/
+data/train

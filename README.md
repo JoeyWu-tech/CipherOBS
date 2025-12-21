@@ -4,6 +4,12 @@
 > *Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval*  
 > Submitted to *Nature Machine Intelligence*
 
+<p align="center">
+  <a href="https://www.nature.com/natmachintell/"><img src="https://img.shields.io/badge/Nature-Machine%20Intelligence-red.svg" alt="Journal"></a>
+  <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.0%2B-orange.svg" alt="PyTorch"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
+</p>
+
 ---
 
 ## Abstract
@@ -11,6 +17,22 @@
 Understanding humanity's earliest writing systems is crucial for reconstructing civilization's origins, yet many ancient scripts remain undeciphered. **CipherOBS** reframes the decipherment of Oracle Bone Script (OBS) from a closed-set classification problem to a **generative dictionary-based retrieval** task.
 
 By synthesizing a comprehensive dictionary of plausible OBS variants for modern Chinese characters (using Font-Augmented Diffusion and Stroke Refinement), our system allows scholars to query unknown inscriptions and retrieve visually similar candidates with transparent evidence. This approach achieves state-of-the-art performance on unseen characters and remains robust against archaeological degradation.
+
+---
+
+## Table of Contents
+
+- [System Architecture](#system-architecture)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Data Preparation](#data-preparation)
+- [Pre-trained Weights](#pre-trained-weights)
+- [Reproducing Results](#reproducing-results)
+- [Training](#training)
+- [Inference](#inference)
+- [Project Structure](#project-structure)
+- [Citation](#citation)
+- [Contact](#contact)
 
 ---
 
@@ -22,12 +44,6 @@ CipherOBS employs a two-stage generative pipeline followed by dictionary retriev
   <img src="assets/system_overview.png" alt="System Overview" width="800"/>
 </p>
 
-<p align="center">
-  <a href="https://www.nature.com/natmachintell/"><img src="https://img.shields.io/badge/Nature-Machine%20Intelligence-red.svg" alt="Journal"></a>
-  <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.0%2B-orange.svg" alt="PyTorch"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
-</p>
-
 | Stage | Method | Description |
 |-------|--------|-------------|
 | **Stage 1** | Font-Augmented Diffusion (FAD) | Generates initial OBS drafts from modern Chinese characters |
@@ -36,21 +52,23 @@ CipherOBS employs a two-stage generative pipeline followed by dictionary retriev
 
 ---
 
-## Table of Contents
+## Quick Start
 
-- [Installation](#installation)
-- [Data Preparation](#data-preparation)
-- [Pre-trained Weights](#pre-trained-weights)
-- [Training](#training)
-  - [Stage 1: FAD Training](#stage-1-fad-training)
-  - [Stage 2: SR Training](#stage-2-sr-training)
-- [Inference](#inference)
-  - [Stage 1: FAD Inference](#stage-1-fad-inference)
-  - [Stage 2: SR Inference](#stage-2-sr-inference)
-  - [Dictionary Retrieval](#dictionary-retrieval)
-- [Project Structure](#project-structure)
-- [Citation](#citation)
-- [Contact](#contact)
+To reproduce our main results with minimal setup:
+
+```bash
+# Clone and install
+git clone https://github.com/your-username/CipherOBS.git
+cd CipherOBS && pip install -r requirements.txt
+
+# Option 1: Run demo notebook (requires pre-computed features)
+jupyter notebook notebooks/retrieval_demo.ipynb
+
+# Option 2: Run retrieval on pre-generated dictionary
+bash scripts/retrieval_infer.sh
+```
+
+For detailed reproduction options, see [Reproducing Results](#reproducing-results).
 
 ---
 
@@ -116,10 +134,10 @@ data/
 
 ## Pre-trained Weights
 
-> ⚠️ **Coming Soon:** Pre-trained model weights will be released upon acceptance of the paper.  
+> **Coming Soon:** Pre-trained model weights and pre-computed features will be released upon paper acceptance.  
 > In the meantime, you can train the models from scratch using the instructions below.
 
-The weights will be organized as follows:
+The released files will be organized as follows:
 
 ```
 weights/
@@ -129,7 +147,107 @@ weights/
 │   └── total_model.pth            # Stage 2: SR checkpoint
 └── retrieval/
     └── convnext_encoder.pth       # Retrieval encoder checkpoint
+
+data/
+├── features/                       # Pre-computed features (for demo notebook)
+│   ├── query_features.npy         # Query image features
+│   └── dict_features.npy          # Dictionary image features
+└── dictionary/                     # Pre-generated OBS dictionary (for retrieval)
+    └── *.png                       # Generated OBS images
 ```
+
+---
+
+## Reproducing Results
+
+We provide **four ways** to reproduce our results, from quickest (using pre-computed features) to complete (training from scratch):
+
+| Method | Time | Requirements | Description |
+|--------|------|--------------|-------------|
+| [**Option 1: Demo Notebook**](#option-1-demo-notebook-fastest) | ~1 min | Pre-computed features | Reproduce main results instantly |
+| [**Option 2: Retrieval Only**](#option-2-retrieval-only) | ~5 min | Pre-generated dictionary | Run retrieval on provided dictionary |
+| [**Option 3: Full Inference**](#option-3-full-inference-pipeline) | ~30 min | Pre-trained weights | Generate dictionary + retrieval |
+| [**Option 4: Train from Scratch**](#option-4-train-from-scratch) | ~2 days | Training data | Complete reproduction |
+
+### Option 1: Demo Notebook (Fastest)
+
+The quickest way to reproduce our main experimental results using pre-computed features:
+
+```bash
+# Launch Jupyter and open the demo notebook
+jupyter notebook notebooks/retrieval_demo.ipynb
+```
+
+This notebook:
+- Loads pre-extracted features for query images and dictionary
+- Performs nearest-neighbor retrieval
+- Computes Top-K accuracy metrics
+- Visualizes retrieval results
+
+**Expected Results:**
+
+| Top-1 | Top-10 | Top-20 | Top-50 | Top-100 |
+|-------|--------|--------|--------|---------|
+| 21.20 | 54.33  | 66.76  | 86.15  | 96.85   |
+
+> **Required files:** `data/features/query_features.npy`, `data/features/dict_features.npy`
+
+### Option 2: Retrieval Only
+
+If you have a pre-generated OBS dictionary (from Stage 1 & 2), run retrieval directly:
+
+```bash
+# Basic usage with default paths
+bash scripts/retrieval_infer.sh
+
+# Custom query and dictionary directories
+bash scripts/retrieval_infer.sh --query data/test/target --dict data/dictionary --gpu 0
+```
+
+**Outputs:** `results/retrieval/` containing:
+- `retrieval_results.json`: Top-K matches for each query
+- `metrics.json`: Accuracy metrics (Top-1, Top-10, Top-20, Top-50, Top-100)
+
+> **Required:** Query images in `data/test/target/`, dictionary in `data/dictionary/`
+
+### Option 3: Full Inference Pipeline
+
+Generate the OBS dictionary from modern Chinese characters using pre-trained weights, then perform retrieval:
+
+```bash
+# Step 1: Stage 1 - Generate draft OBS images
+bash scripts/stage1_infer.sh
+
+# Step 2: Stage 2 - Refine with stroke enhancement  
+bash scripts/stage2_infer.sh
+
+# Step 3: Run retrieval on generated dictionary
+bash scripts/retrieval_infer.sh --dict outputs/stage2/inference
+```
+
+> **Required:** Pre-trained weights in `weights/stage1/`, `weights/stage2/`, `weights/retrieval/`
+
+### Option 4: Train from Scratch
+
+For complete reproduction including model training:
+
+```bash
+# Step 1: Train Stage 1 (FAD) model
+bash scripts/stage1_train.sh
+
+# Step 2: Generate Stage 1 outputs for Stage 2 training data
+bash scripts/stage1_infer.sh
+
+# Step 3: Train Stage 2 (SR) model
+bash scripts/stage2_train.sh
+
+# Step 4: Run full inference pipeline (see Option 3)
+bash scripts/stage1_infer.sh
+bash scripts/stage2_infer.sh
+bash scripts/retrieval_infer.sh --dict outputs/stage2/inference
+```
+
+> **Training time:** ~24h for Stage 1, ~12h for Stage 2 (on 8× A100 GPUs)
 
 ---
 
@@ -288,6 +406,9 @@ CipherOBS/
 │   └── retrieval/
 │       └── infer.yaml         # Retrieval inference config
 │
+├── notebooks/                  # Jupyter notebooks for demos
+│   └── retrieval_demo.ipynb   # Quick reproduction with pre-computed features
+│
 ├── scripts/                    # Shell scripts for training/inference
 │   ├── stage1_train.sh
 │   ├── stage1_infer.sh
@@ -311,6 +432,8 @@ CipherOBS/
 │       └── infer.py           # Retrieval inference
 │
 ├── data/                       # Data directory (user-provided)
+│   ├── features/              # Pre-computed features (for demo notebook)
+│   ├── dictionary/            # Pre-generated OBS dictionary
 │   └── README.md              # Data preparation guide
 │
 ├── weights/                    # Model checkpoints (coming soon)
@@ -331,8 +454,8 @@ If you find this work useful, please cite our paper:
 @article{CipherOBS2025,
   title   = {Decoding Ancient Oracle Bone Script via Generative Dictionary Retrieval},
   author  = {Wu, Yin and Zhang, Gangjian and Chen, Jiayu and Xu, Chang and Luo, Yuyu and Tang, Nan and Xiong, Hui},
-  
   journal = {Submitted to Nature Machine Intelligence},
+  note    = {Under review},
   year    = {2025}
 }
 ```

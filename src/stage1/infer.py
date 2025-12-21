@@ -10,8 +10,8 @@ import torch
 import numpy as np
 import torch.distributed as dist
 
-from data.dataset import InferDataset
-from models import DenoisingDiffusion, DiffusiveRestoration
+from stage1.data.dataset import InferDataset
+from stage1.models import DenoisingDiffusion, DiffusiveRestoration
 
 os.environ['NCCL_P2P_DISABLE'] = '1'
 

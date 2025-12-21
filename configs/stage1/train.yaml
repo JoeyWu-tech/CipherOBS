@@ -1,5 +1,4 @@
-# Stage 1: Font-Augmented Diffusion (FAD) Training Configuration
-# All paths are relative to project root: /home/wuyin/CipherOBS
+
 
 data:
     image_size: 64

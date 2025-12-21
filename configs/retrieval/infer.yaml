@@ -11,7 +11,7 @@ query_dir: "data/test/target"
 
 # Directory containing dictionary images (generated from Stage 1 & 2)
 # These are the predicted OBS shapes for modern Chinese characters
-dict_dir: "outputs/stage2/inference/"
+dict_dir: "data/dictionary"
 
 # ============================================================================
 # Model Configuration
@@ -19,23 +19,24 @@ dict_dir: "outputs/stage2/inference/"
 
 # Directory containing trained feature extraction model
 # Should contain: opts.yaml, net_*.pth checkpoint files
-# For example, 
-model_dir: "weights/retrieval/convnext_tri/"
+model_dir: "weights/retrieval/convnext_tri"
 
 # ============================================================================
 # Image Processing
 # ============================================================================
 
-# Image dimensions
+# Image dimensions (from model config, will be overridden if model config has h/w)
 height: 256
 width: 256
 
-# Padding for query images (handles boundary artifacts in rubbings)
+# Padding for query images
+# Note: The legacy test.py uses pad=0 by default (does NOT load from model config)
+# Set to 0 to match legacy behavior
 pad: 0
 
 # Multi-scale factors for feature extraction
 # More scales = better accuracy but slower inference
-scales: [1.0]
+ms: "1"
 
 # ============================================================================
 # Inference Settings
@@ -46,4 +47,3 @@ batch_size: 8
 
 # Output directory for results
 output_dir: "results/retrieval"
-

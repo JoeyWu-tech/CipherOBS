@@ -1,0 +1,8 @@
+OBS Dictionary Retrieval Results
+==================================================
+Query directory: data/test/target
+Dictionary directory: data/dictionary
+Number of queries: 6830
+Dictionary size: 6830
+==================================================
+Top1:21.20 Top5:43.28 Top10:54.33 Top100:96.85 Top500:100.00

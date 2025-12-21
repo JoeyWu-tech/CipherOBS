@@ -2,62 +2,42 @@
 """
 Utility functions for OBS retrieval.
 
-Provides model loading and configuration utilities.
+Provides model loading and configuration utilities that match the legacy code
+for checkpoint compatibility.
 """
 
 import os
 import torch
+import torch.nn as nn
 import yaml
 
-# Handle both package and direct imports
-try:
-    from .models.encoder import two_view_net
-except ImportError:
-    from models.encoder import two_view_net
+from .models.encoder import two_view_net
 
 
-def get_model_path(model_dir, pattern='net'):
-    """Find the latest model checkpoint in directory.
-    
-    Args:
-        model_dir: Directory containing model checkpoints.
-        pattern: Filename pattern to match.
-        
-    Returns:
-        Path to the latest checkpoint, or None if not found.
-    """
-    if not os.path.exists(model_dir):
-        print(f'Model directory not found: {model_dir}')
+def get_model_list(dirname, key):
+    """Find the latest model checkpoint in directory (legacy compatible)."""
+    if not os.path.exists(dirname):
+        print(f'No directory: {dirname}')
         return None
-    
-    model_files = [
-        os.path.join(model_dir, f) for f in os.listdir(model_dir)
-        if os.path.isfile(os.path.join(model_dir, f)) and pattern in f and f.endswith('.pth')
+    gen_models = [
+        os.path.join(dirname, f) for f in os.listdir(dirname)
+        if os.path.isfile(os.path.join(dirname, f)) and key in f and ".pth" in f
     ]
-    
-    if not model_files:
+    if not gen_models:
         return None
-    
-    model_files.sort()
-    return model_files[-1]
+    gen_models.sort()
+    return gen_models[-1]
 
 
 def load_config(config_path):
-    """Load configuration from YAML file.
-    
-    Args:
-        config_path: Path to config YAML file.
-        
-    Returns:
-        Configuration dictionary.
-    """
+    """Load configuration from YAML file."""
     with open(config_path, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
     return config
 
 
 def load_model(model_dir, device='cuda'):
-    """Load trained retrieval model.
+    """Load trained retrieval model (legacy compatible).
     
     The model weights should be placed in the specified model_dir with:
     - opts.yaml: Model configuration
@@ -77,20 +57,19 @@ def load_model(model_dir, device='cuda'):
     
     config = load_config(config_path)
     
-    # Find checkpoint
-    checkpoint_path = get_model_path(model_dir, 'net')
-    if checkpoint_path is None:
-        raise FileNotFoundError(f"No checkpoint found in: {model_dir}")
-    
-    print(f'Loading model from: {checkpoint_path}')
-    
-    # Extract epoch from filename
-    epoch = os.path.basename(checkpoint_path).split('_')[1].split('.')[0]
+    # Find checkpoint (legacy logic)
+    last_model_name = os.path.basename(get_model_list(model_dir, 'net'))
+    epoch = last_model_name.split('_')[1]
+    epoch = epoch.split('.')[0]
+    if epoch != 'last':
+        epoch = int(epoch)
     
     # Build model with config parameters (matches original training code)
     num_classes = config.get('nclasses', 701)
     block = config.get('block', 2)
     resnet = config.get('resnet', False)
+    
+    print(f'Building model: nclasses={num_classes}, block={block}, resnet={resnet}')
     
     model = two_view_net(
         class_num=num_classes, 
@@ -100,10 +79,18 @@ def load_model(model_dir, device='cuda'):
     )
     
     # Load weights
-    state_dict = torch.load(checkpoint_path, map_location=device)
+    if isinstance(epoch, int):
+        save_filename = 'net_%03d.pth' % epoch
+    else:
+        save_filename = 'net_%s.pth' % epoch
+    
+    save_path = os.path.join(model_dir, save_filename)
+    print(f'Loading model from: {save_path}')
+    
+    state_dict = torch.load(save_path, map_location=device)
     model.load_state_dict(state_dict)
     
-    # Set to eval mode
+    # Set to eval mode and move to device
     model = model.to(device)
     model.eval()
     
@@ -139,6 +126,7 @@ class LabelMapper:
     """Maps string labels to numeric IDs and vice versa.
     
     Ensures consistent label encoding between query and dictionary datasets.
+    Uses global mapping like the legacy code.
     """
     
     def __init__(self):

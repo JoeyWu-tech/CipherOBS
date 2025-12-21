@@ -3,39 +3,28 @@
 Feature Encoder for OBS Dictionary Retrieval.
 
 This module implements the ConvNeXt-based feature encoder used for extracting
-visual features from Oracle Bone Script images. The encoder incorporates
-triplet attention for enhanced part-based feature learning.
-
-Note: The model structure matches the original training code to ensure
-weight compatibility with pre-trained checkpoints.
+visual features from Oracle Bone Script images. The structure exactly matches
+the original training code to ensure weight compatibility.
 """
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from timm.models import create_model
+
+# Import custom ConvNeXt that returns (gap_feature, spatial_feature) tuple
+from .backbone.convnext import convnext_tiny
 
 
 # ============================================================================
-# Attention Modules
+# Attention Modules (exact copy from legacy code for weight compatibility)
 # ============================================================================
-
-class ZPool(nn.Module):
-    """Z-Pool: Concatenates max and mean pooled features along channel dimension."""
-    
-    def forward(self, x):
-        return torch.cat(
-            (torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)),
-            dim=1
-        )
-
 
 class BasicConv(nn.Module):
     """Basic convolution block with optional batch norm and ReLU."""
     
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, 
                  dilation=1, groups=1, relu=True, bn=True, bias=False):
-        super().__init__()
+        super(BasicConv, self).__init__()
+        self.out_channels = out_planes
         self.conv = nn.Conv2d(
             in_planes, out_planes, kernel_size=kernel_size, stride=stride,
             padding=padding, dilation=dilation, groups=groups, bias=bias
@@ -52,11 +41,21 @@ class BasicConv(nn.Module):
         return x
 
 
+class ZPool(nn.Module):
+    """Z-Pool: Concatenates max and mean pooled features along channel dimension."""
+    
+    def forward(self, x):
+        return torch.cat(
+            (torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)),
+            dim=1
+        )
+
+
 class AttentionGate(nn.Module):
     """Spatial attention gate using Z-Pool and convolution."""
     
     def __init__(self):
-        super().__init__()
+        super(AttentionGate, self).__init__()
         kernel_size = 7
         self.compress = ZPool()
         self.conv = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, relu=False)
@@ -72,7 +71,7 @@ class TripletAttention(nn.Module):
     """Triplet Attention module for capturing cross-dimension interactions."""
     
     def __init__(self):
-        super().__init__()
+        super(TripletAttention, self).__init__()
         self.cw = AttentionGate()
         self.hc = AttentionGate()
     
@@ -89,7 +88,7 @@ class TripletAttention(nn.Module):
 
 
 # ============================================================================
-# Classification Block
+# Classification Block (exact copy from legacy code)
 # ============================================================================
 
 def weights_init_kaiming(m):
@@ -117,22 +116,11 @@ def weights_init_classifier(m):
 
 
 class ClassBlock(nn.Module):
-    """Classification block with bottleneck layer.
-    
-    Args:
-        input_dim: Input feature dimension.
-        class_num: Number of output classes.
-        droprate: Dropout rate.
-        relu: Whether to use ReLU.
-        bnorm: Whether to use batch normalization.
-        num_bottleneck: Bottleneck dimension.
-        linear: Whether to use linear layer.
-        return_f: Whether to return features during training.
-    """
+    """Classification block with bottleneck layer."""
     
     def __init__(self, input_dim, class_num, droprate, relu=False, bnorm=True, 
                  num_bottleneck=512, linear=True, return_f=False):
-        super().__init__()
+        super(ClassBlock, self).__init__()
         self.return_f = return_f
         add_block = []
         if linear:
@@ -171,7 +159,7 @@ class ClassBlock(nn.Module):
 
 
 # ============================================================================
-# Main Model (matches original structure for weight compatibility)
+# Main Model (exact structure from legacy code for weight compatibility)
 # ============================================================================
 
 class build_convnext(nn.Module):
@@ -179,29 +167,19 @@ class build_convnext(nn.Module):
     
     Note: This class name and structure matches the original training code
     to ensure weight compatibility.
-    
-    Args:
-        num_classes: Number of character classes.
-        block: Number of part attention blocks. Default: 2.
-        return_f: Return features during training. Default: False.
-        resnet: Use ResNet backbone instead. Default: False.
     """
     
     def __init__(self, num_classes, block=2, return_f=False, resnet=False):
-        super().__init__()
+        super(build_convnext, self).__init__()
         self.return_f = return_f
         self.block = block
         
         if resnet:
             raise NotImplementedError("ResNet backbone not supported in this version")
         
-        # ConvNeXt backbone
-        convnext_name = "convnext_tiny"
+        # Use custom ConvNeXt that returns (gap_feature, spatial_feature) tuple
         self.in_planes = 768
-        self.convnext = create_model(convnext_name, pretrained=True)
-        
-        # Layer norm for global features
-        self.norm = nn.LayerNorm(self.in_planes, eps=1e-6)
+        self.convnext = convnext_tiny(pretrained=True)
         
         self.num_classes = num_classes
         self.classifier1 = ClassBlock(self.in_planes, num_classes, 0.5, return_f=return_f)
@@ -212,11 +190,9 @@ class build_convnext(nn.Module):
             setattr(self, name, ClassBlock(self.in_planes, num_classes, 0.5, return_f=self.return_f))
 
     def forward(self, x):
-        # Extract features from backbone
-        spatial_feature = self.convnext.forward_features(x)  # (B, C, H, W)
-        gap_feature = self.norm(spatial_feature.mean([-2, -1]))  # (B, C)
-        
-        tri_features = self.tri_layer(spatial_feature)
+        # Extract features - convnext returns (gap_feature, part_features) tuple
+        gap_feature, part_features = self.convnext(x)
+        tri_features = self.tri_layer(part_features)
         convnext_feature = self.classifier1(gap_feature)
 
         tri_list = []
@@ -266,16 +242,10 @@ class two_view_net(nn.Module):
     Uses shared weights between query and dictionary branches.
     
     Note: This class name matches the original training code for weight compatibility.
-    
-    Args:
-        class_num: Number of character classes.
-        block: Number of attention blocks. Default: 2.
-        return_f: Return features during training. Default: False.
-        resnet: Use ResNet backbone. Default: False.
     """
     
     def __init__(self, class_num, block=2, return_f=False, resnet=False):
-        super().__init__()
+        super(two_view_net, self).__init__()
         self.model_1 = build_convnext(
             num_classes=class_num, 
             block=block, 
@@ -284,15 +254,7 @@ class two_view_net(nn.Module):
         )
 
     def forward(self, x1, x2):
-        """Forward pass for query and dictionary images.
-        
-        Args:
-            x1: Query images (can be None).
-            x2: Dictionary images (can be None).
-            
-        Returns:
-            Tuple of (query_features, dict_features).
-        """
+        """Forward pass for query and dictionary images."""
         if x1 is None:
             y1 = None
         else:
@@ -306,6 +268,12 @@ class two_view_net(nn.Module):
         return y1, y2
 
 
-# Alias for compatibility
+# Aliases for backward compatibility
 FeatureEncoder = build_convnext
 TwoViewEncoder = two_view_net
+
+
+def make_convnext_model(num_class, block=4, return_f=False, resnet=False):
+    """Factory function to create ConvNeXt model."""
+    model = build_convnext(num_class, block=block, return_f=return_f, resnet=resnet)
+    return model
